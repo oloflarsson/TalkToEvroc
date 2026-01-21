@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Open TalkToEvroc voice client
+
+if [[ "$1" == "local" ]]; then
+    open "http://localhost:7860"
+else
+    open "https://talktoevroc.olof.tech"
+fi

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Build TalkToEvroc Docker image (frontend + backend)
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.." || exit 1
+
+echo "📦 Building frontend with Bun..."
+cd client
+if [ ! -d "node_modules" ]; then
+    bun install
+fi
+bun run build
+cd ..
+
+echo ""
+echo "🐳 Building Docker image..."
+docker build -t talktoevroc .

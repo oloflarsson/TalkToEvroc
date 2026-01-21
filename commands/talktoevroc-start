@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Start TalkToEvroc Voice Bot (Backend + Frontend for development)
+# Starts: Piper TTS HTTP server, Backend API, Frontend dev server
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.." || exit 1
+
+# Sync Python dependencies
+uv sync
+
+# Install frontend dependencies if needed
+if [ ! -d "client/node_modules" ]; then
+    echo "📦 Installing frontend dependencies..."
+    cd client && bun install && cd ..
+fi
+
+# Download Piper voice model if needed (KB-labb NST Swedish voice)
+PIPER_VOICE_DIR="$HOME/.local/share/piper-voices"
+PIPER_VOICE_MODEL="$PIPER_VOICE_DIR/sv_SE-nst-medium.onnx"
+if [ ! -f "$PIPER_VOICE_MODEL" ]; then
+    echo "📥 Downloading Piper Swedish NST voice (KB-labb)..."
+    mkdir -p "$PIPER_VOICE_DIR"
+    curl -L -o "$PIPER_VOICE_MODEL" \
+        "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/sv/sv_SE/nst/medium/sv_SE-nst-medium.onnx"
+    curl -L -o "$PIPER_VOICE_MODEL.json" \
+        "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/sv/sv_SE/nst/medium/sv_SE-nst-medium.onnx.json"
+fi
+
+echo "� Starting TalkToEvroc..."
+echo ""
+echo "📍 Piper TTS Server:    http://localhost:5000"
+echo "📍 Backend API:         http://localhost:7860"
+echo "📍 Frontend (Vite dev): http://localhost:5173"
+echo ""
+echo "Press Ctrl+C to stop all processes"
+echo ""
+
+# Trap to kill all processes on exit
+cleanup() {
+    echo ""
+    echo "🛑 Stopping TalkToEvroc..."
+    kill $PIPER_PID $BACKEND_PID $FRONTEND_PID 2>/dev/null
+    exit 0
+}
+trap cleanup SIGINT SIGTERM
+
+# Start Piper TTS HTTP server
+echo "🔊 Starting Piper TTS server..."
+uv run python -m piper.http_server \
+    --host 127.0.0.1 \
+    --port 5000 \
+    -m "$PIPER_VOICE_MODEL" &
+PIPER_PID=$!
+
+# Wait for Piper to be ready
+echo "⏳ Waiting for Piper TTS server..."
+for i in {1..30}; do
+    if curl -sf http://127.0.0.1:5000/voices > /dev/null 2>&1; then
+        echo "✅ Piper TTS server ready!"
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        echo "❌ Piper TTS server failed to start"
+        kill $PIPER_PID 2>/dev/null
+        exit 1
+    fi
+    sleep 0.5
+done
+
+# Start backend
+cd app
+uv run python server.py &
+BACKEND_PID=$!
+cd ..
+
+# Wait for backend to start
+sleep 2
+
+# Start frontend dev server
+cd client
+bun run dev &
+FRONTEND_PID=$!
+cd ..
+
+# Wait for all processes
+wait $PIPER_PID $BACKEND_PID $FRONTEND_PID

@@ -1,0 +1,14 @@
+[project]
+name = "talktoevroc"
+version = "0.1.0"
+description = "Swedish voice chatbot using Evroc services"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "loguru>=0.7.0",
+    # Pipecat voice AI framework with required service integrations
+    "pipecat-ai[webrtc,silero,openai,local-smart-turn-v3]",
+    # Piper TTS with HTTP server for Swedish voice synthesis
+    "piper-tts[http]>=1.3.0",
+]

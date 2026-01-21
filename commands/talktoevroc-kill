@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+echo "Stopping TalkToEvroc..."
+
+pkill -f "python.*bot.py" 2>/dev/null && echo "Killed bot.py"
+pkill -f "uvicorn" 2>/dev/null && echo "Killed uvicorn"
+
+docker stop talktoevroc 2>/dev/null && echo "Stopped talktoevroc container"
+docker ps -q --filter "publish=7860" | xargs -r docker stop 2>/dev/null
+docker ps -q --filter "publish=7743" | xargs -r docker stop 2>/dev/null
+
+echo "Done"

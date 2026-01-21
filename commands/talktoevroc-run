@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Run TalkToEvroc Docker container locally
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.." || exit 1
+
+docker run --rm -it -p 7860:7860 \
+    -e EVROC_API_KEY_STT \
+    -e EVROC_API_KEY_LLM \
+    talktoevroc
