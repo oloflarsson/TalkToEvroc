@@ -5,7 +5,7 @@
 set -e
 
 # Start Piper TTS (sources script, sets PIPER_PID)
-source ./start-piper.sh
+source ./piper-start.sh
 
 # Cleanup on exit
 trap "kill $PIPER_PID 2>/dev/null || true" EXIT

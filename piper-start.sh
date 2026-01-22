@@ -7,7 +7,7 @@
 # Must be run from project root directory.
 #
 # Usage:
-#   source ./start-piper.sh
+#   source ./piper-start.sh
 #   # Now PIPER_PID is set and Piper is running
 #
 # On failure: returns 1 (does not exit, since we're sourced)
@@ -16,7 +16,7 @@ VOICE_MODEL="./piper-voices/sv_SE-nst-medium.onnx"
 
 # Download voice model if missing
 if [ ! -f "$VOICE_MODEL" ]; then
-    ./download-piper-voice.sh || return 1
+    ./piper-download-voice.sh || return 1
 fi
 
 # Speech speed factor (1.5 = 50% faster)

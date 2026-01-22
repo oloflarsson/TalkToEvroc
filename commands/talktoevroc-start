@@ -35,7 +35,7 @@ trap cleanup SIGINT SIGTERM
 
 # Start Piper TTS (sources script, sets PIPER_PID as direct child)
 echo "🔊 Starting Piper TTS server..."
-source ./start-piper.sh || exit 1
+source ./piper-start.sh || exit 1
 echo "✅ Piper TTS server ready!"
 
 # Start backend

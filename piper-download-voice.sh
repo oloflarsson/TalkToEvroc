@@ -2,7 +2,7 @@
 # Download Piper Swedish NST voice model (KB-labb)
 #
 # Usage:
-#   ./download-piper-voice.sh [target-dir]
+#   ./piper-download-voice.sh [target-dir]
 #
 # Default target: ./piper-voices/
 

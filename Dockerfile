@@ -44,8 +44,8 @@ RUN VENV_SITE_PACKAGES=$(/app/.venv/bin/python -c "import site; print(site.getsi
     echo "/opt/krisp_viva/krisp_audio" > ${VENV_SITE_PACKAGES}/krisp_viva.pth
 
 # Copy voice model download script and download the model
-COPY download-piper-voice.sh /app/download-piper-voice.sh
-RUN chmod +x /app/download-piper-voice.sh && ./download-piper-voice.sh
+COPY piper-download-voice.sh /app/piper-download-voice.sh
+RUN chmod +x /app/piper-download-voice.sh && ./piper-download-voice.sh
 
 # Copy pre-built frontend (built locally with `bun run build` in client/)
 COPY client/dist/ /app/static/
@@ -54,7 +54,7 @@ COPY client/dist/ /app/static/
 COPY app/ .
 
 # Copy startup scripts
-COPY start-piper.sh /app/start-piper.sh
+COPY piper-start.sh /app/piper-start.sh
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/*.sh
 
