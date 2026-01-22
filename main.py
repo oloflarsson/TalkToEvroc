@@ -1,21 +1,27 @@
-"""Pipecat Voice Bot - Simple Swedish Chatbot using Evroc services.
+"""TalkToEvroc Voice Bot - Swedish chatbot using Evroc services.
 
-Uses Pipecat framework with:
-- Evroc KBLab Whisper (Speech-to-Text) - Swedish language
-- Evroc GPT-OSS-120B (LLM)
-- Piper TTS (Text-to-Speech) - Swedish NST voice from KB-labb (local, no API key required)
-- Silero (Voice Activity Detection) + Smart Turn v3 (ML-powered turn detection)
+A Pipecat voice bot using:
+- STT: Evroc KBLab Whisper (Swedish)
+- LLM: Evroc GPT-OSS-120B
+- TTS: Piper with Swedish NST voice (local)
+- VAD: Silero + Smart Turn v3
 
 WebSocket transport for production reliability (works through firewalls/NAT).
 """
 
 import os
 import re
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 import aiohttp
+import uvicorn
+from fastapi import FastAPI, WebSocket, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from loguru import logger
 
-from fastapi import WebSocket
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
@@ -43,7 +49,26 @@ from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.transcriptions.language import Language
 from pipecat.processors.text_transformer import StatelessTextTransformer
 
-# Pronunciation fixes for Piper TTS - maps mispronounced words to phonetic Swedish
+# =============================================================================
+# Configuration
+# =============================================================================
+
+# API keys and URLs
+EVROC_API_KEY_STT = os.environ.get("EVROC_API_KEY_STT", "")
+EVROC_API_KEY_LLM = os.environ.get("EVROC_API_KEY_LLM", "")
+EVROC_BASE_URL = "https://models.think.cloud.evroc.com/v1"
+PIPER_TTS_URL = "http://127.0.0.1:5000"
+
+# Static files path - check both development and production locations
+STATIC_DIR = Path(__file__).parent / "static"
+if not STATIC_DIR.exists():
+    STATIC_DIR = Path(__file__).parent / "client" / "dist"
+
+# =============================================================================
+# Pronunciation Fixes for Swedish TTS
+# =============================================================================
+
+# Maps mispronounced words to phonetic Swedish
 # Handles: word boundaries, hyphenated compounds (AI-kluster, Realtids-AI), case-insensitive
 PRONUNCIATION_FIXES: dict[str, str] = {
     "AI": "äj-aj",
@@ -79,17 +104,10 @@ def fix_pronunciation(text: str) -> str:
         text = pattern.sub(replace_fn, text)
     return text
 
-# Evroc API keys from environment variables
-EVROC_API_KEY_STT = os.environ.get("EVROC_API_KEY_STT", "")
-EVROC_API_KEY_LLM = os.environ.get("EVROC_API_KEY_LLM", "")
+# =============================================================================
+# System Prompt
+# =============================================================================
 
-# Piper TTS HTTP server URL (running locally in container)
-PIPER_TTS_URL = "http://127.0.0.1:5000"
-
-# Evroc API base URL (OpenAI-compatible)
-EVROC_BASE_URL = "https://models.think.cloud.evroc.com/v1"
-
-# System prompt (Swedish) - Evroc demo voice assistant
 SYSTEM_PROMPT = """
 Du är en röstassistent i en teknisk demo som visar vad Evrocs molnplattform kan göra.
 Detta är INTE en officiell Evroc-produkt, utan en demo byggd av en tredjepartsutvecklare
@@ -136,18 +154,79 @@ VARFÖR EVROC:
 Svara på svenska om inte användaren pratar annat språk.
 """.strip()
 
+# =============================================================================
+# FastAPI Application
+# =============================================================================
 
-async def run_bot_websocket(websocket_client: WebSocket):
-    """Run the voice bot pipeline with WebSocket transport.
-    
-    This is the main entry point, called from server.py.
-    Uses WebSocket for reliable connectivity through firewalls/NAT.
-    """
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle FastAPI startup and shutdown."""
+    logger.info("Starting TalkToEvroc server...")
+    yield
+    logger.info("Shutting down TalkToEvroc server...")
+
+
+app = FastAPI(lifespan=lifespan, title="TalkToEvroc")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/")
+async def serve_index():
+    """Serve the main client page."""
+    index_path = STATIC_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    return {"error": "Client not built. Run 'bun run build' in client/ directory."}
+
+
+@app.post("/connect")
+async def connect(request: Request):
+    """Return the WebSocket URL for the client to connect to."""
+    host = request.headers.get("host", "localhost:7860")
+    scheme = "wss" if request.url.scheme == "https" else "ws"
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    if forwarded_proto:
+        scheme = "wss" if forwarded_proto == "https" else "ws"
+    ws_url = f"{scheme}://{host}/ws"
+    logger.info(f"Client requesting connection, returning: {ws_url}")
+    return {"ws_url": ws_url}
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Handle WebSocket connections for voice bot."""
+    await websocket.accept()
+    logger.info("WebSocket connection accepted")
+    try:
+        await run_bot(websocket)
+    except Exception as e:
+        logger.error(f"Exception in WebSocket handler: {e}")
+    finally:
+        logger.info("WebSocket connection closed")
+
+
+# Mount static files after routes (so routes take precedence)
+if STATIC_DIR.exists() and (STATIC_DIR / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+# =============================================================================
+# Voice Bot Pipeline
+# =============================================================================
+
+async def run_bot(websocket: WebSocket):
+    """Run the voice bot pipeline with WebSocket transport."""
     logger.info("Starting WebSocket bot pipeline")
 
     # Create WebSocket transport with Protobuf serialization
     transport = FastAPIWebsocketTransport(
-        websocket=websocket_client,
+        websocket=websocket,
         params=FastAPIWebsocketParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
@@ -169,7 +248,7 @@ async def run_bot_websocket(websocket_client: WebSocket):
 
     # Create aiohttp session for Piper TTS (must be created in async context)
     aiohttp_session = aiohttp.ClientSession()
-    
+
     # Text-to-Speech service - Piper with Swedish NST voice from KB-labb (local, no API key)
     # sv_SE-nst-medium: Swedish voice trained on NST dataset, native 22050 Hz
     # https://kb-labb.github.io/posts/2023-05-24-swedish-text-to-speech/
@@ -186,15 +265,12 @@ async def run_bot_websocket(websocket_client: WebSocket):
         api_key=EVROC_API_KEY_LLM,
         base_url=EVROC_BASE_URL,
         model="openai/gpt-oss-120b",
-        params=BaseOpenAILLMService.InputParams(
-            extra={"reasoning_effort": "low"}
-        ),
+        params=BaseOpenAILLMService.InputParams(extra={"reasoning_effort": "low"}),
     )
 
     # Create LLM context with system prompt
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    context = LLMContext(messages)
-    
+    context = LLMContext([{"role": "system", "content": SYSTEM_PROMPT}])
+
     # Create context aggregator pair with Smart Turn Detection
     # This enables ML-powered turn detection for natural conversation flow
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
@@ -262,3 +338,14 @@ async def run_bot_websocket(websocket_client: WebSocket):
     finally:
         # Cleanup aiohttp session
         await aiohttp_session.close()
+
+# =============================================================================
+# Entry Point
+# =============================================================================
+
+if __name__ == "__main__":
+    # Default to localhost for security (local dev). Docker sets HOST=0.0.0.0 in entrypoint.sh
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", "7860"))
+    logger.info(f"Starting server on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)

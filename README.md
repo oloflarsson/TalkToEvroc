@@ -84,9 +84,7 @@ Visit `http://localhost:7860`.
 ## Project Structure
 
 ```
-├── app/
-│   ├── bot.py          # Pipecat voice pipeline
-│   └── server.py       # FastAPI WebSocket server
+├── main.py             # Voice bot + FastAPI server (single file)
 ├── client/
 │   └── src/            # React frontend
 ├── commands/           # Development scripts

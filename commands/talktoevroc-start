@@ -39,10 +39,8 @@ source ./piper-start.sh || exit 1
 echo "✅ Piper TTS server ready!"
 
 # Start backend
-cd app
-uv run python server.py &
+uv run python main.py &
 BACKEND_PID=$!
-cd ..
 
 # Wait for backend to start
 sleep 2

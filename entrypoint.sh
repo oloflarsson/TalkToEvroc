@@ -11,10 +11,10 @@ source ./piper-start.sh
 trap "kill $PIPER_PID 2>/dev/null || true" EXIT
 
 # Docker must bind to 0.0.0.0 for port forwarding to work.
-# Local dev uses 127.0.0.1 by default (see server.py) for security.
+# Local dev uses 127.0.0.1 by default (see main.py) for security.
 export HOST=${HOST:-0.0.0.0}
 
 echo "Starting main application..."
 
 # Start main application (runs in foreground)
-exec python server.py
+exec python main.py

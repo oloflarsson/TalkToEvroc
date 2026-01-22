@@ -50,8 +50,8 @@ RUN chmod +x /app/piper-download-voice.sh && ./piper-download-voice.sh
 # Copy pre-built frontend (built locally with `bun run build` in client/)
 COPY client/dist/ /app/static/
 
-# Copy application code
-COPY app/ .
+# Copy application code (single file)
+COPY main.py .
 
 # Copy startup scripts
 COPY piper-start.sh /app/piper-start.sh
