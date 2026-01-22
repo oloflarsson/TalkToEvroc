@@ -7,6 +7,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.34.0",
     "loguru>=0.7.0",
+    "emoji>=2.0.0",  # Emoji handling for TTS cleanup
     # Pipecat voice AI framework with required service integrations
     "pipecat-ai[webrtc,silero,openai,local-smart-turn-v3]",
     # Piper TTS with HTTP server for Swedish voice synthesis

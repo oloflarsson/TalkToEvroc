@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import aiohttp
+import emoji
 import uvicorn
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -95,7 +96,10 @@ PRONUNCIATION_PATTERNS: list[tuple[re.Pattern, str]] = [
 
 
 def fix_pronunciation(text: str) -> str:
-    """Fix TTS pronunciation. Handles standalone words and hyphenated compounds."""
+    """Fix TTS pronunciation: strip emojis and fix mispronounced words."""
+    # Strip emojis (Piper can't handle them)
+    text = emoji.replace_emoji(text, "")
+    # Fix pronunciation of specific words
     for pattern, replacement in PRONUNCIATION_PATTERNS:
         def replace_fn(m, repl=replacement):
             prefix = m.group(1) or ""
