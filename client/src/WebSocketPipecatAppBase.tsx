@@ -2,6 +2,7 @@
  * WebSocketPipecatAppBase - Custom wrapper for WebSocket transport
  *
  * Simplified version without external theme dependencies.
+ * Creates fresh transport/client for each connection to avoid audio issues on reconnect.
  */
 
 import {
@@ -14,7 +15,7 @@ import {
   PipecatClientAudio,
 } from "@pipecat-ai/client-react";
 import { WebSocketTransport } from "@pipecat-ai/websocket-transport";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Props for the WebSocketPipecatAppBase component.
@@ -60,6 +61,10 @@ export interface WebSocketPipecatBaseChildProps {
 
 /**
  * WebSocketPipecatAppBase component that provides a configured PipecatClient with WebSocket transport.
+ *
+ * IMPORTANT: This component creates a fresh PipecatClient and WebSocketTransport for each new
+ * connection. This is necessary because WebSocketTransport doesn't properly reset its internal
+ * audio state after disconnection, causing audio playback to fail on subsequent connections.
  */
 export const WebSocketPipecatAppBase: React.FC<WebSocketPipecatBaseProps> = ({
   connectEndpoint,
@@ -74,131 +79,136 @@ export const WebSocketPipecatAppBase: React.FC<WebSocketPipecatBaseProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
 
+  // Use ref to track current client for cleanup on unmount
+  const clientRef = useRef<PipecatClient | null>(null);
+
   /**
-   * Connect to the bot session by fetching ws_url from the connectEndpoint
+   * Creates a fresh PipecatClient with a new WebSocketTransport instance.
+   * This ensures audio works correctly for each new session.
    */
-  const doConnect = useCallback(
-    async (pcClient: PipecatClient) => {
-      try {
-        setIsConnecting(true);
-        setError(null);
+  const createFreshClient = useCallback(() => {
+    const transport = new WebSocketTransport();
 
-        // Use startBotAndConnect which handles the API call and connection
-        await pcClient.startBotAndConnect({
-          endpoint: connectEndpoint,
-        });
-      } catch (err) {
-        console.error("[WebSocketPipecatAppBase] Connection error:", err);
-        setError(
-          `Failed to connect: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      } finally {
-        setIsConnecting(false);
-      }
-    },
-    [connectEndpoint],
-  );
+    const pcClient = new PipecatClient({
+      enableCam: false,
+      enableMic: true,
+      transport: transport,
+      ...clientOptions,
+      callbacks: {
+        ...callbacks,
+        // Merge error callback
+        onError: (message: RTVIMessage) => {
+          console.error("[WebSocketPipecatAppBase] Error:", message);
+          setError(String(message));
+          callbacks?.onError?.(message);
+        },
+      },
+    });
+
+    return pcClient;
+  }, [clientOptions, callbacks]);
 
   /**
-   * Initialize the Pipecat client with WebSocket transport
+   * Connect handler - creates a fresh client and connects.
+   * Creating a new client for each connection ensures audio works properly.
+   */
+  const handleConnect = useCallback(async () => {
+    // Don't connect if already connecting
+    if (isConnecting) return;
+
+    try {
+      setIsConnecting(true);
+      setError(null);
+
+      // Disconnect and cleanup any existing client first
+      if (clientRef.current) {
+        const state = clientRef.current.state;
+        if (state === "ready" || state === "connecting") {
+          try {
+            await clientRef.current.disconnect();
+          } catch (e) {
+            console.warn(
+              "[WebSocketPipecatAppBase] Error disconnecting old client:",
+              e,
+            );
+          }
+        }
+        clientRef.current = null;
+        setClient(null);
+      }
+
+      // Create a fresh client for this connection
+      const newClient = createFreshClient();
+      clientRef.current = newClient;
+      setClient(newClient);
+
+      // Initialize devices if requested
+      if (initDevicesOnMount) {
+        await newClient.initDevices();
+      }
+
+      // Connect using startBotAndConnect which handles the API call
+      await newClient.startBotAndConnect({
+        endpoint: connectEndpoint,
+      });
+    } catch (err) {
+      console.error("[WebSocketPipecatAppBase] Connection error:", err);
+      setError(
+        `Failed to connect: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      // Clean up failed client
+      clientRef.current = null;
+      setClient(null);
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [connectEndpoint, createFreshClient, initDevicesOnMount, isConnecting]);
+
+  /**
+   * Disconnect handler - disconnects and clears client.
+   */
+  const handleDisconnect = useCallback(async () => {
+    if (!clientRef.current) return;
+
+    const state = clientRef.current.state;
+    if (state === "ready" || state === "connecting") {
+      try {
+        await clientRef.current.disconnect();
+      } catch (e) {
+        console.warn("[WebSocketPipecatAppBase] Error during disconnect:", e);
+      }
+    }
+
+    // Clear the client after disconnect so next connect creates fresh one
+    clientRef.current = null;
+    setClient(null);
+  }, []);
+
+  /**
+   * Auto-connect on mount if requested
    */
   useEffect(() => {
-    let currentClient: PipecatClient | null = null;
+    if (connectOnMount) {
+      handleConnect();
+    }
+  }, [connectOnMount]); // Intentionally not including handleConnect to avoid re-running
 
-    (async () => {
-      try {
-        const transport = new WebSocketTransport();
-
-        const pcClient = new PipecatClient({
-          enableCam: false,
-          enableMic: true,
-          transport: transport,
-          ...clientOptions,
-          callbacks: {
-            ...callbacks,
-            // Merge error callback
-            onError: (message: RTVIMessage) => {
-              console.error("[WebSocketPipecatAppBase] Error:", message);
-              setError(String(message));
-              callbacks?.onError?.(message);
-            },
-          },
-        });
-
-        currentClient = pcClient;
-        setClient(pcClient);
-
-        if (initDevicesOnMount) {
-          await pcClient.initDevices();
-        }
-
-        if (connectOnMount) {
-          await doConnect(pcClient);
-        }
-      } catch (err) {
-        console.error("[WebSocketPipecatAppBase] Failed to initialize:", err);
-        setError(
-          `Failed to initialize: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      }
-    })();
-
+  /**
+   * Cleanup on unmount
+   */
+  useEffect(() => {
     return () => {
-      if (currentClient) {
-        // Only disconnect if we're in a connected state, otherwise we get
-        // "Session ended: please call .begin() first" error
-        const state = currentClient.state;
+      if (clientRef.current) {
+        const state = clientRef.current.state;
         if (state === "ready" || state === "connecting") {
-          currentClient.disconnect().catch(console.error);
+          clientRef.current.disconnect().catch(console.error);
         }
+        clientRef.current = null;
       }
-      setClient(null);
-      setError(null);
     };
-  }, [
-    connectEndpoint,
-    clientOptions,
-    callbacks,
-    connectOnMount,
-    initDevicesOnMount,
-    doConnect,
-  ]);
-
-  /**
-   * Connect handler for external use
-   */
-  const handleConnect = async () => {
-    if (
-      !client ||
-      !["initialized", "disconnected", "error"].includes(client.state)
-    ) {
-      return;
-    }
-    await doConnect(client);
-  };
-
-  /**
-   * Disconnect handler
-   */
-  const handleDisconnect = async () => {
-    if (!client) return;
-    // Only disconnect if we're in a connected state
-    const state = client.state;
-    if (state === "ready" || state === "connecting") {
-      await client.disconnect();
-    }
-  };
-
-  // Show children even while client is initializing (for loading states)
-  if (!client) {
-    return typeof children === "function"
-      ? (children({ client: null, error, isConnecting }) as React.ReactElement)
-      : (children as React.ReactElement);
-  }
+  }, []);
 
   const passedProps: WebSocketPipecatBaseChildProps = {
     client,
@@ -207,6 +217,14 @@ export const WebSocketPipecatAppBase: React.FC<WebSocketPipecatBaseProps> = ({
     error,
     isConnecting,
   };
+
+  // When no client exists, render children without the provider
+  // This allows the UI to show connect button etc.
+  if (!client) {
+    return typeof children === "function"
+      ? (children(passedProps) as React.ReactElement)
+      : (children as React.ReactElement);
+  }
 
   return (
     <PipecatClientProvider client={client}>

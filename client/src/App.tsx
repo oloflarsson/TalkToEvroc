@@ -28,19 +28,78 @@ const messageHandlers = {
   clearMessages: null as (() => void) | null,
 };
 
-// Inner component that uses the Pipecat hooks
-function TalkToEvrocUI({
-  client,
-  handleConnect,
+// Inner component that uses the Pipecat hooks - only rendered when client exists
+function ConnectedUI({
   handleDisconnect,
-  isConnecting,
   messages,
-}: WebSocketPipecatBaseChildProps & { messages: ChatMessage[] }) {
+}: {
+  handleDisconnect?: () => Promise<void>;
+  messages: ChatMessage[];
+}) {
   const transportState = usePipecatClientTransportState();
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Transport state can be: 'disconnected', 'initializing', 'initialized', 'connecting', 'connected', 'ready', 'disconnecting', 'error'
+  // We're "connected" only when ready, and "connecting" for any state that isn't ready yet
   const isConnected = transportState === "ready";
-  const isConnectingState = isConnecting || transportState === "connecting";
+  const isConnecting = !isConnected;
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Disconnect is instant - no waiting, just trigger it
+  const handleButtonClick = () => {
+    if (isConnected) {
+      handleDisconnect?.();
+    }
+  };
+
+  const getButtonText = () => {
+    if (isConnecting) return "Ansluter...";
+    return "Avsluta";
+  };
+
+  return (
+    <div className="container">
+      <button
+        className={`main-button ${isConnected ? "connected" : ""} ${isConnecting ? "connecting" : ""}`}
+        onClick={handleButtonClick}
+        disabled={isConnecting}
+      >
+        {getButtonText()}
+      </button>
+
+      {/* Show chat box when connected, even if empty */}
+      {isConnected && (
+        <div className="chat-history">
+          {messages.map((msg, i) => (
+            <div key={i} className={`chat-message ${msg.role}`}>
+              <span className="chat-role">
+                {msg.role === "user" ? "👤" : "🤖"}
+              </span>
+              <span className="chat-text">{msg.text}</span>
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Disconnected UI - shown when no client exists (no provider context)
+function DisconnectedUI({
+  handleConnect,
+  isConnecting,
+  messages,
+}: {
+  handleConnect?: () => Promise<void>;
+  isConnecting?: boolean;
+  messages: ChatMessage[];
+}) {
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -48,29 +107,19 @@ function TalkToEvrocUI({
   }, [messages]);
 
   const handleButtonClick = async () => {
-    if (isConnected) {
-      await handleDisconnect?.();
-    } else if (!isConnectingState) {
+    if (!isConnecting) {
       await handleConnect?.();
     }
   };
 
-  const getButtonText = () => {
-    if (isConnectingState) return "Ansluter...";
-    if (isConnected) return "Avsluta";
-    return "Starta";
-  };
-
-  const isButtonDisabled = !client || isConnectingState;
-
   return (
     <div className="container">
       <button
-        className={`main-button ${isConnected ? "connected" : ""} ${isConnectingState ? "connecting" : ""}`}
+        className={`main-button ${isConnecting ? "connecting" : ""}`}
         onClick={handleButtonClick}
-        disabled={isButtonDisabled}
+        disabled={isConnecting}
       >
-        {getButtonText()}
+        {isConnecting ? "Ansluter..." : "Starta"}
       </button>
 
       {messages.length > 0 && (
@@ -87,6 +136,31 @@ function TalkToEvrocUI({
         </div>
       )}
     </div>
+  );
+}
+
+// Main UI component that switches between connected and disconnected states
+function TalkToEvrocUI({
+  client,
+  handleConnect,
+  handleDisconnect,
+  isConnecting,
+  messages,
+}: WebSocketPipecatBaseChildProps & { messages: ChatMessage[] }) {
+  // When client exists, we're inside the provider and can use hooks
+  // When client is null, we're outside the provider
+  if (client) {
+    return (
+      <ConnectedUI handleDisconnect={handleDisconnect} messages={messages} />
+    );
+  }
+
+  return (
+    <DisconnectedUI
+      handleConnect={handleConnect}
+      isConnecting={isConnecting}
+      messages={messages}
+    />
   );
 }
 
