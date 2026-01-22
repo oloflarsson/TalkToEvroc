@@ -10,6 +10,7 @@ WebSocket transport for production reliability (works through firewalls/NAT).
 """
 
 import os
+import re
 
 import aiohttp
 from loguru import logger
@@ -42,37 +43,40 @@ from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.transcriptions.language import Language
 from pipecat.processors.text_transformer import StatelessTextTransformer
 
-# Pronunciation fixes for Piper TTS (Swedish NST voice)
-# Maps words that are mispronounced to phonetically correct alternatives
-PRONUNCIATION_FIXES = {
-    "AI-kluster": "äj-aj-kluster",
-    "AI-": "äj-aj-",
-    "GPU-": "g p u-",
+# Pronunciation fixes for Piper TTS - maps mispronounced words to phonetic Swedish
+# Handles: word boundaries, hyphenated compounds (AI-kluster, Realtids-AI), case-insensitive
+PRONUNCIATION_FIXES: dict[str, str] = {
+    "AI": "äj-aj",
     "GPU": "g p u",
+    "API": "a p i",
     "B200": "b två hundra",
     "H100": "h ett hundra",
     "NVIDIA": "envidia",
-    "API": "a p i",
-    # English tech terms with Swedish phonetic approximations
     "Compute": "kompjut",
     "Storage": "stårridsch",
     "Kubernetes": "kubernätis",
     "Serverless": "sörverlöss",
-    "hyperscale-moln": "hajperskäjl-moln",
-    "hyperscale‑moln": "hajperskäjl-moln",  # with non-breaking hyphen
-    "hyperscale-anläggningar": "hajperskäjl-anläggningar",
-    "hyperscale‑anläggningar": "hajperskäjl-anläggningar",  # with non-breaking hyphen
     "hyperscale": "hajperskäjl",
-    # Brand name
-    "Evroc": "Evrock",
+    "demo": "deemå",
+    "agent": "äggennt",
     "Evrocs": "Evrocks",
+    "Evroc": "Evrock",
 }
+
+PRONUNCIATION_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(rf"(?:(?<=\w)(-)|\b){re.escape(word)}(?:-(\w+)|\b)", re.IGNORECASE), repl)
+    for word, repl in PRONUNCIATION_FIXES.items()
+]
 
 
 def fix_pronunciation(text: str) -> str:
-    """Apply pronunciation fixes for Piper TTS."""
-    for word, replacement in PRONUNCIATION_FIXES.items():
-        text = text.replace(word, replacement)
+    """Fix TTS pronunciation. Handles standalone words and hyphenated compounds."""
+    for pattern, replacement in PRONUNCIATION_PATTERNS:
+        def replace_fn(m, repl=replacement):
+            prefix = m.group(1) or ""
+            suffix = m.group(2)
+            return f"{prefix}{repl}-{suffix}" if suffix else f"{prefix}{repl}"
+        text = pattern.sub(replace_fn, text)
     return text
 
 # Evroc API keys from environment variables
