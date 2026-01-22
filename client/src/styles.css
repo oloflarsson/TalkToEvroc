@@ -115,3 +115,25 @@ body {
   color: rgba(255, 255, 255, 0.9);
   font-size: 16px;
 }
+
+/* GitHub link */
+.github-link {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.2s ease;
+  z-index: 100;
+  display: block;
+  line-height: 1;
+}
+
+.github-link:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.github-link svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
