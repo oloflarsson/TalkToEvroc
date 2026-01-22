@@ -3,6 +3,9 @@
 # Java Flight Recorder
 *.jfr
 
+# Piper TTS voice models (downloaded on first run)
+piper-voices/
+
 # Python
 __pycache__/
 *.py[cod]

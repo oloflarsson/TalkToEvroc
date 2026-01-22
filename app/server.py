@@ -92,7 +92,8 @@ if STATIC_DIR.exists():
 
 def main():
     """Run the server."""
-    host = os.getenv("HOST", "0.0.0.0")
+    # Default to localhost for security (local dev). Docker sets HOST=0.0.0.0 in entrypoint.sh
+    host = os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", "7860"))
     
     logger.info(f"Starting server on {host}:{port}")

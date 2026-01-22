@@ -43,14 +43,9 @@ RUN VENV_SITE_PACKAGES=$(/app/.venv/bin/python -c "import site; print(site.getsi
     ln -s /krisp/python/pipecat_ai_krisp ${VENV_SITE_PACKAGES}/pipecat_ai_krisp && \
     echo "/opt/krisp_viva/krisp_audio" > ${VENV_SITE_PACKAGES}/krisp_viva.pth
 
-# Download Piper Swedish NST voice model (KB-labb)
-# sv_SE-nst-medium: Swedish voice trained by KBLab on NST dataset, 22050 Hz sample rate
-# https://kb-labb.github.io/posts/2023-05-24-swedish-text-to-speech/
-RUN mkdir -p /app/piper-voices && \
-    curl -L -o /app/piper-voices/sv_SE-nst-medium.onnx \
-      "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/sv/sv_SE/nst/medium/sv_SE-nst-medium.onnx" && \
-    curl -L -o /app/piper-voices/sv_SE-nst-medium.onnx.json \
-      "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/sv/sv_SE/nst/medium/sv_SE-nst-medium.onnx.json"
+# Copy voice model download script and download the model
+COPY download-piper-voice.sh /app/download-piper-voice.sh
+RUN chmod +x /app/download-piper-voice.sh && ./download-piper-voice.sh
 
 # Copy pre-built frontend (built locally with `bun run build` in client/)
 COPY client/dist/ /app/static/
@@ -58,15 +53,13 @@ COPY client/dist/ /app/static/
 # Copy application code
 COPY app/ .
 
-# Copy entrypoint script
+# Copy startup scripts
+COPY start-piper.sh /app/start-piper.sh
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/*.sh
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
-
-# Piper voice model path for the HTTP server
-ENV PIPER_VOICE_MODEL="/app/piper-voices/sv_SE-nst-medium.onnx"
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
