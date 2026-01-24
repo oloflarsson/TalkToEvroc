@@ -23,6 +23,5 @@ Set `HOST` env var to override (e.g., `HOST=0.0.0.0` for network access during l
 ## Environment Variables (Required)
 
 ```bash
-export EVROC_API_KEY_STT="..."  # Speech-to-Text
-export EVROC_API_KEY_LLM="..."  # LLM
+export EVROC_API_KEY="..."  # Used for both STT and LLM
 ```

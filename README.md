@@ -48,8 +48,7 @@ cd TalkToEvroc
 ### 2. Set environment variables
 
 ```bash
-export EVROC_API_KEY_STT="your-stt-api-key"
-export EVROC_API_KEY_LLM="your-llm-api-key"
+export EVROC_API_KEY="your-api-key"
 ```
 
 ### 3. Run locally

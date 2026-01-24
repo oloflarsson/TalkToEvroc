@@ -33,8 +33,7 @@ builder:
 
 env:
   secret:
-    - EVROC_API_KEY_STT
-    - EVROC_API_KEY_LLM
+    - EVROC_API_KEY
 
 aliases:
   shell: app exec --interactive --reuse "bash"

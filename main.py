@@ -55,8 +55,7 @@ from pipecat.processors.text_transformer import StatelessTextTransformer
 # =============================================================================
 
 # API keys and URLs
-EVROC_API_KEY_STT = os.environ.get("EVROC_API_KEY_STT", "")
-EVROC_API_KEY_LLM = os.environ.get("EVROC_API_KEY_LLM", "")
+EVROC_API_KEY = os.environ.get("EVROC_API_KEY", "")
 EVROC_BASE_URL = "https://models.think.cloud.evroc.com/v1"
 PIPER_TTS_URL = "http://127.0.0.1:5000"
 
@@ -243,7 +242,7 @@ async def run_bot(websocket: WebSocket):
     # Speech-to-Text service - Evroc KBLab Whisper (Swedish language)
     # Prompt helps Whisper recognize domain-specific terms like "Evroc"
     stt = OpenAISTTService(
-        api_key=EVROC_API_KEY_STT,
+        api_key=EVROC_API_KEY,
         base_url=EVROC_BASE_URL,
         model="KBLab/kb-whisper-large",
         language=Language.SV,
@@ -266,7 +265,7 @@ async def run_bot(websocket: WebSocket):
     # LLM service - Evroc GPT-OSS-120B (OpenAI-compatible)
     # Using lowest reasoning effort for faster responses
     llm = OpenAILLMService(
-        api_key=EVROC_API_KEY_LLM,
+        api_key=EVROC_API_KEY,
         base_url=EVROC_BASE_URL,
         model="openai/gpt-oss-120b",
         params=BaseOpenAILLMService.InputParams(extra={"reasoning_effort": "low"}),
