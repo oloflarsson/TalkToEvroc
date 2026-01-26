@@ -55,8 +55,11 @@ function ConnectedUI({
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Transport state can be: 'disconnected', 'initializing', 'initialized', 'connecting', 'connected', 'ready', 'disconnecting', 'error'
-  // We're "connected" only when ready, and "connecting" for any state that isn't ready yet
-  const isConnected = transportState === "ready";
+  // We're "connected" only when ready AND we've received a bot message
+  // This prevents the confusing "connected but empty" state
+  const isTransportReady = transportState === "ready";
+  const hasReceivedBotMessage = messages.some((msg) => msg.role === "bot");
+  const isConnected = isTransportReady && hasReceivedBotMessage;
   const isConnecting = !isConnected;
 
   // Auto-scroll to bottom when new messages arrive
