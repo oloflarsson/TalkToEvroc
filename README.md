@@ -1,10 +1,12 @@
 # TalkToEvroc
 
+![TalkToEvroc Screenshot](screenshot.png)
+
 A real-time Swedish voice assistant demo built with [Pipecat](https://github.com/pipecat-ai/pipecat) and [Evroc](https://evroc.com/) cloud services.
 
 🎙️ **[Try the live demo →](https://talktoevroc.olof.tech)**
 
-![TalkToEvroc Screenshot](screenshot.png)
+📝 **[Read the blog post →](https://olof.tech/swedish-realtime-voice-agent/)**
 
 ## What is this?
 
