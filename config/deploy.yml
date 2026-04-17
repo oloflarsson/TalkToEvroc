@@ -6,10 +6,7 @@ deploy_timeout: 20
 
 servers:
   web:
-    - 185.222.60.186
-
-ssh:
-  user: evroc-user
+    - 135.181.151.248
 
 proxy:
   ssl: true
