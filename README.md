@@ -1,8 +1,8 @@
-# TalkToEvroc
+# TalkToBerget
 
-![TalkToEvroc Screenshot](screenshot.png)
+![TalkToBerget Screenshot](screenshot.png)
 
-A real-time Swedish voice assistant demo built with [Pipecat](https://github.com/pipecat-ai/pipecat) and [Evroc](https://evroc.com/) cloud services.
+A real-time Swedish voice assistant demo built with [Pipecat](https://github.com/pipecat-ai/pipecat) and [Berget AI](https://berget.ai/) cloud services.
 
 🎙️ **[Try the live demo →](https://talktoevroc.olof.tech)**
 
@@ -12,13 +12,13 @@ A real-time Swedish voice assistant demo built with [Pipecat](https://github.com
 
 This project demonstrates how to build a low-latency, real-time voice agent using:
 
-- **Speech-to-Text**: [KBLab kb-whisper-large](https://huggingface.co/KBLab/kb-whisper-large) - Swedish Whisper model running on Evroc
-- **LLM**: GPT-OSS-120B via Evroc Think Models
+- **Speech-to-Text**: [KBLab kb-whisper-large](https://huggingface.co/KBLab/kb-whisper-large) - Swedish Whisper model running on Berget AI or Evroc
+- **LLM**: GPT-OSS-120B via Berget AI or Evroc Think Models
 - **Text-to-Speech**: [Piper TTS](https://github.com/rhasspy/piper) with Swedish NST voice from [KB-labb](https://kb-labb.github.io/posts/2023-05-24-swedish-text-to-speech/)
 - **Framework**: [Pipecat](https://github.com/pipecat-ai/pipecat) for real-time voice AI pipelines
 - **Transport**: WebSocket with Protobuf serialization for browser connectivity
 
-The voice assistant speaks Swedish and can answer questions about Evroc, European cloud infrastructure, and general topics.
+The voice assistant speaks Swedish and can answer questions about Berget AI, European cloud infrastructure, and general topics.
 
 ## Architecture
 
@@ -27,8 +27,8 @@ Browser (React) ←WebSocket→ FastAPI Server ←→ Pipecat Pipeline
                                                     ↓
                                     ┌───────────────┼───────────────┐
                                     ↓               ↓               ↓
-                               Evroc STT      Evroc LLM       Piper TTS
-                            (kb-whisper)    (GPT-OSS-120B)   (Swedish NST)
+                            Berget/Evroc STT  Berget/Evroc LLM   Piper TTS
+                            (kb-whisper)     (GPT-OSS-120B)    (Swedish NST)
 ```
 
 ## Prerequisites
@@ -49,9 +49,15 @@ cd TalkToEvroc
 
 ### 2. Set environment variables
 
+Set **either** `BERGET_API_KEY` or `EVROC_API_KEY`:
+
 ```bash
-export EVROC_API_KEY="your-api-key"
+export BERGET_API_KEY="your-api-key"  # Preferred - Berget AI
+# OR
+export EVROC_API_KEY="your-api-key"   # Legacy - Evroc
 ```
+
+The bot will automatically use whichever API key is configured.
 
 ### 3. Run locally
 
@@ -109,6 +115,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
+- [Berget AI](https://berget.ai/) for Swedish AI services and European cloud infrastructure
 - [Evroc](https://evroc.com/) for European cloud infrastructure and AI services
 - [Pipecat](https://github.com/pipecat-ai/pipecat) for the voice AI framework
 - [KBLab](https://kb-labb.github.io/) for Swedish language models

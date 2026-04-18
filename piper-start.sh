@@ -22,7 +22,7 @@ fi
 # Speech speed factor (1.5 = 50% faster)
 # Piper uses length_scale where lower = faster, so we invert: 1/1.5 ≈ 0.67
 SPEED_FACTOR=1.5
-LENGTH_SCALE=$(awk "BEGIN {printf \"%.3f\", 1 / $SPEED_FACTOR}")
+LENGTH_SCALE=$(LC_ALL=C awk "BEGIN {printf \"%.3f\", 1 / $SPEED_FACTOR}")
 
 echo "Starting Piper TTS (${SPEED_FACTOR}x speed)..." >&2
 

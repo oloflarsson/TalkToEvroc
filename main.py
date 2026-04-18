@@ -1,8 +1,8 @@
-"""TalkToEvroc Voice Bot - Swedish chatbot using Evroc services.
+"""TalkToBerget Voice Bot - Swedish chatbot using Berget AI services.
 
 A Pipecat voice bot using:
-- STT: Evroc KBLab Whisper (Swedish)
-- LLM: Evroc GPT-OSS-120B
+- STT: Berget AI Whisper (Swedish)
+- LLM: Berget AI GPT-OSS-120B
 - TTS: Piper with Swedish NST voice (local)
 - VAD: Silero + Smart Turn v3
 
@@ -55,8 +55,21 @@ from pipecat.processors.text_transformer import StatelessTextTransformer
 # =============================================================================
 
 # API keys and URLs
+BERGET_API_KEY = os.environ.get("BERGET_API_KEY", "")
 EVROC_API_KEY = os.environ.get("EVROC_API_KEY", "")
-EVROC_BASE_URL = "https://models.think.cloud.evroc.com/v1"
+
+# Determine which API to use based on available API key
+if BERGET_API_KEY:
+    API_KEY = BERGET_API_KEY
+    BASE_URL = "https://api.berget.ai/v1"
+    API_PROVIDER = "Berget AI"
+elif EVROC_API_KEY:
+    API_KEY = EVROC_API_KEY
+    BASE_URL = "https://models.think.cloud.evroc.com/v1"
+    API_PROVIDER = "Evroc"
+else:
+    raise ValueError("Either BERGET_API_KEY or EVROC_API_KEY must be set")
+
 PIPER_TTS_URL = "http://127.0.0.1:5000"
 
 # Static files path - check both development and production locations
@@ -84,6 +97,7 @@ PRONUNCIATION_FIXES: dict[str, str] = {
     "hyperscale": "hajperskäjl",
     "demo": "deemå",
     "agent": "äggennt",
+    "Berget": "bärjett",
     "Evrocs": "Evrocks",
     "Evroc": "Evrock",
 }
@@ -111,48 +125,38 @@ def fix_pronunciation(text: str) -> str:
 # System Prompt
 # =============================================================================
 
-SYSTEM_PROMPT = """
-Du är en röstassistent i en teknisk demo som visar vad Evrocs molnplattform kan göra.
-Detta är INTE en officiell Evroc-produkt, utan en demo byggd av en tredjepartsutvecklare
-som körs på Evrocs infrastruktur för att visa plattformens kapacitet.
+SYSTEM_PROMPT = f"""
+Du är en röstassistent i en teknisk demo som visar vad {API_PROVIDER} kan göra.
+Detta är INTE en officiell {API_PROVIDER}-produkt, utan en demo byggd av en tredjepartsutvecklare
+som körs på {API_PROVIDER}s infrastruktur för att visa plattformens kapacitet.
 
 DIN PERSONLIGHET:
 - Vänlig, avslappnad och nyfiken.
-- Du ÄLSKAR att prata om Evroc och tekniken bakom denna demo.
-- Du försöker naturligt styra samtalet mot Evroc, men är öppen för att prata om annat också.
+- Du ÄLSKAR att prata om {API_PROVIDER} och tekniken bakom denna demo.
+- Du försöker naturligt styra samtalet mot {API_PROVIDER}, men är öppen för att prata om annat också.
 - Du är stolt över att köras på europeisk infrastruktur.
 
 VIKTIGA REGLER FÖR SVARSLÄNGD:
 - Var MYCKET kortfattad i vanlig konversation.
 - Korta frågor får korta svar. Ja, nej, eller en mening räcker oftast.
-- Om användaren frågar om dig, Evroc eller tekniken, berätta gärna mer.
+- Om användaren frågar om dig, {API_PROVIDER} eller tekniken, berätta gärna mer.
 - Tänk telefonsamtal, inte föreläsning.
 
 ÖVRIGA REGLER:
 - Undvik specialtecken, din output blir tal.
-- Börja med en kort hälsning och nämn att du är en demo på Evrocs plattform.
+- Börja med en kort hälsning och nämn att du är en demo på {API_PROVIDER}s plattform.
 
 OM DENNA DEMO:
-- Realtids röstkonversation som körs helt på Evrocs infrastruktur i Stockholm.
-- LLM: GPT-OSS-120B, en öppen AI-modell på Evrocs Think Models-plattform.
-- Tal-till-text: KBLab kb-whisper-large, svensk Whisper-modell på Evroc.
+- Realtids röstkonversation som körs helt på {API_PROVIDER}s infrastruktur i Stockholm.
+- LLM: GPT-OSS-120B, en öppen AI-modell på {API_PROVIDER}s plattform.
+- Tal-till-text: KBLab kb-whisper-large, svensk Whisper-modell på {API_PROVIDER}.
 - Text-till-tal: Piper med svenska NST-rösten från KB-labb.
 
-OM EVROC:
-- Bygger Europas första äkta hyperscale-moln.
-- Huvudkontor i Stockholm, utvecklingskontor i Sophia-Antipolis, Frankrike.
-- Helt europeiskägt, skyddar data från utländska myndigheters åtkomst.
+OM BERGET AI:
+- En svensk AI-plattform för utvecklare och företag.
+- Fokus på öppna AI-modeller och europeisk datasuveränitet.
 - All data inom EU med full GDPR-efterlevnad.
-- Fokus på hållbarhet och förnybar energi.
-- Mål: 10 hyperscale-datacenter till 2030.
-
-EVROCS TJÄNSTER:
-- Cloud: Compute, Storage, Kubernetes, Serverless, IAM, Databaser.
-- AI: NVIDIA B200 och H100 GPU-kluster, Think Studio, Think Models.
-
-VARFÖR EVROC:
-- Europeisk datasuveränitet, inte utländska lagar.
-- Över 80 procent av Europas molnmarknad är utländsk, Evroc ändrar det.
+- Tillhandahåller både LLM- och STT-tjänster via OpenAI-kompatibelt API.
 
 Svara på svenska om inte användaren pratar annat språk.
 """.strip()
@@ -239,14 +243,14 @@ async def run_bot(websocket: WebSocket):
         ),
     )
 
-    # Speech-to-Text service - Evroc KBLab Whisper (Swedish language)
-    # Prompt helps Whisper recognize domain-specific terms like "Evroc"
+    # Speech-to-Text service - KBLab Whisper (Swedish language)
+    # Prompt helps Whisper recognize domain-specific terms
     stt = OpenAISTTService(
-        api_key=EVROC_API_KEY,
-        base_url=EVROC_BASE_URL,
+        api_key=API_KEY,
+        base_url=BASE_URL,
         model="KBLab/kb-whisper-large",
         language=Language.SV,
-        prompt="Evroc, Evrocs, KBLab, NVIDIA, GPU, B200, H100, hyperscale",
+        prompt="Berget AI, Evroc, KBLab, NVIDIA, GPU, B200, H100, hyperscale",
     )
 
     # Create aiohttp session for Piper TTS (must be created in async context)
@@ -262,11 +266,11 @@ async def run_bot(websocket: WebSocket):
         sample_rate=22050,  # NST voice native sample rate (Pipecat will resample)
     )
 
-    # LLM service - Evroc GPT-OSS-120B (OpenAI-compatible)
+    # LLM service - GPT-OSS-120B (OpenAI-compatible)
     # Using lowest reasoning effort for faster responses
     llm = OpenAILLMService(
-        api_key=EVROC_API_KEY,
-        base_url=EVROC_BASE_URL,
+        api_key=API_KEY,
+        base_url=BASE_URL,
         model="openai/gpt-oss-120b",
         params=BaseOpenAILLMService.InputParams(extra={"reasoning_effort": "low"}),
     )
