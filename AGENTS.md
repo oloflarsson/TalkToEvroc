@@ -5,7 +5,7 @@
 - Local: http://localhost:7860
 - Prod: https://talktoevroc.olof.tech
 - Simple Swedish chatbot using Evroc services
-- Single instance Kamal deployment
+- Deployed as a single container image; `commands/talktoevroc-release` builds and pushes it
 
 ## Services
 

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Build the production image and push it to the registry.
+#
+# Pre-builds the frontend locally (native arch) to avoid cross-arch Docker
+# issues, then builds the image for linux/amd64 and pushes it as :latest plus
+# the current git sha, so a bad release can be rolled back by retagging.
+#
+# Logs in with GHCR_TOKEN if set (a GitHub PAT with write:packages), else
+# relies on an existing `docker login`. Point IMAGE at your own registry to
+# use it elsewhere.
+
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.." || exit 1
+
+IMAGE="${IMAGE:-ghcr.io/oloflarsson/talktoevroc}"
+SHA="$(git rev-parse --short HEAD)"
+
+if [ -n "${GHCR_TOKEN:-}" ]; then
+    echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-oloflarsson}" --password-stdin
+fi
+
+echo "📦 Building frontend with Bun..."
+(cd client && { [ -d node_modules ] || bun install; } && bun run build)
+
+echo ""
+echo "🐳 Building and pushing $IMAGE:latest ($SHA)..."
+docker build --platform linux/amd64 \
+    -t "$IMAGE:latest" -t "$IMAGE:$SHA" \
+    --push .
+
+echo ""
+echo "✅ Pushed. The server pulls :latest nightly; to roll it out now:"
+echo "   ssh homelab sudo oci-update"

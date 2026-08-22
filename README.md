@@ -89,19 +89,18 @@ Visit `http://localhost:7860`.
 ├── client/
 │   └── src/            # React frontend
 ├── commands/           # Development scripts
-├── config/
-│   └── deploy.yml      # Kamal deployment config
 ├── Dockerfile
 └── entrypoint.sh       # Container entrypoint
 ```
 
 ## Deployment
 
-The project uses [Kamal](https://kamal-deploy.org/) for deployment. See `config/deploy.yml` for configuration.
-
-```bash
-./commands/talktoevroc-deploy
-```
+The app is a single Docker image (see `Dockerfile`), so it runs anywhere
+that runs containers. `./commands/talktoevroc-release` builds it for
+linux/amd64 and pushes it to a registry; the one instance at
+talktoevroc.olof.tech runs it as a podman container on a NixOS home server
+that pulls `:latest` nightly. The only configuration is the `EVROC_API_KEY`
+environment variable.
 
 ## License
 
